@@ -26,12 +26,12 @@ This project is a Discord moderator bot built using the `discord.py` library. It
    And then activate the virtual env
    **For unix systems**
    ```
-      source venv/bin/activate  # On Windows use  
+      source venv/bin/activate 
    ```
 
    **For windows**
    ```
-      `venv\Scripts\activate`
+      venv\Scripts\activate
    ```
 
 
@@ -56,7 +56,7 @@ This project is a Discord moderator bot built using the `discord.py` library. It
 
 3. Type hello bot and the following text appears, set up is all DONE
 
-   "Hello, {your name}! I am the moderator bot. \nType !modhelp to be familiar with my commands."
+   `Hello, {your name}! I am the moderator bot. \nType !modhelp to be familiar with my commands.`
 
 
 4. Use the following commands in your Discord server:
@@ -70,4 +70,4 @@ This project is a Discord moderator bot built using the `discord.py` library. It
 
 ## Configuration
 
-- The bot uses `warnings.json` to store user warnings and `blacklist.json` for blacklisted words. These files are located in the `data` directory.
+- The bot uses `warnings.json` to store user warnings and `blacklist.json` for blacklisted words. These files are located in the `data` directory. Remove the last `.template ` on the two files ext before use.

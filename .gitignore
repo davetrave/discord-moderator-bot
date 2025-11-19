@@ -22,7 +22,6 @@ venv.bak/
 
 # Env files / secrets
 .env
-.env.*
 secrets.json
 *.key
 *.pem
