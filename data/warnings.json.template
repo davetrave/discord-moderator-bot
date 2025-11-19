@@ -1,0 +1,30 @@
+{
+  "guild_id_1": {
+    "user_id_1": [
+      {
+        "by": "moderator_id_1",
+        "by_name": "ModeratorName",
+        "reason": "Inappropriate language",
+        "time": "2023-10-01T12:00:00"
+      }
+    ],
+    "user_id_2": [
+      {
+        "by": "moderator_id_2",
+        "by_name": "AnotherModerator",
+        "reason": "Spamming",
+        "time": "2023-10-02T14:30:00"
+      }
+    ]
+  },
+  "guild_id_2": {
+    "user_id_3": [
+      {
+        "by": null,
+        "by_name": "Auto",
+        "reason": "Auto-moderation: used blocked word 'example'",
+        "time": "2023-10-03T16:45:00"
+      }
+    ]
+  }
+}

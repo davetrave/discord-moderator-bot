@@ -1,0 +1,6 @@
+discord.py>=2.0
+asyncio
+json
+pytest
+python-dotenv
+```

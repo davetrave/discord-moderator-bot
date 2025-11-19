@@ -1,0 +1,144 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+venv.bak/
+
+# Env files / secrets
+.env
+.env.*
+secrets.json
+*.key
+*.pem
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pytest
+.pytest_cache/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Type checkers / caches
+.mypy_cache/
+.pyre/
+.python-version
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Sphinx
+docs/_build/
+
+# Node (if using frontend tooling)
+node_modules/
+
+# Local settings
+local_settings.py
+
+# Wheels
+*.whl
+```// filepath: e:\dave\DiscordBot Console\discord-moderator-bot\.gitignore
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+venv.bak/
+
+# Env files / secrets
+.env
+secrets.json
+*.key
+*.pem
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pytest
+.pytest_cache/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Type checkers / caches
+.mypy_cache/
+.pyre/
+.python-version
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+*.json
+
+# Sphinx
+docs/_build/
+
+
+# Local settings
+local_settings.py
+
+# Wheels
