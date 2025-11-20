@@ -135,6 +135,8 @@ async def on_message(message: discord.Message):
 
     await bot.process_commands(message)
 
+
+
 # Helper to add a warning
 async def warn_user(guild: discord.Guild, user: discord.Member, moderator: Optional[discord.Member], reason: str):
     gkey = str(guild.id)
@@ -298,6 +300,57 @@ async def cmd_unlock(ctx, channel: Optional[discord.TextChannel] = None):
         await log_action(ctx.guild, "Channel Unlocked", f"{channel.mention} unlocked by {ctx.author.mention}.")
     except Exception as e:
         await ctx.send(f"Failed to unlock: {e}")
+
+# ———————— ASSIGN ROLE (Give any role to a user) ————————
+@bot.command(name="assign")
+@commands.has_permissions(manage_roles=True)
+async def cmd_assign(ctx, member: discord.Member, *, role_name: str):
+    """
+    Usage: !assign @User Role Name
+    Gives the exact role (case-sensitive) to the user.
+    """
+    role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    
+    if not role:
+        return await ctx.send(f"❌ Role `{role_name}` not found. Check spelling/capitalization.")
+    
+    if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send("❌ You cannot assign a role that is higher than or equal to your highest role.")
+    
+    if role >= ctx.me.top_role:
+        return await ctx.send("❌ I cannot assign this role because it is higher than or equal to my highest role.")
+    
+    try:
+        await member.add_roles(role, reason=f"Assigned by {ctx.author}")
+        await ctx.send(f"✅ Successfully gave **{role.name}** to {member.mention}")
+        await log_action(ctx.guild, "Role Assigned", 
+                        f"{member.mention} was given **{role.name}** by {ctx.author.mention}")
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to manage that role.")
+
+# ———————— REMOVE ROLE (Take any role from a user) ————————
+@bot.command(name="remove")
+@commands.has_permissions(manage_roles=True)
+async def cmd_remove(ctx, member: discord.Member, *, role_name: str):
+    """
+    Usage: !remove @User Role Name
+    Removes the exact role from the user.
+    """
+    role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    
+    if not role:
+        return await ctx.send(f"❌ Role `{role_name}` not found.")
+    
+    if role not in member.roles:
+        return await ctx.send(f"❌ {member.mention} doesn't have the role **{role.name}**.")
+    
+    try:
+        await member.remove_roles(role, reason=f"Removed by {ctx.author}")
+        await ctx.send(f"✅ Successfully removed **{role.name}** from {member.mention}")
+        await log_action(ctx.guild, "Role Removed", 
+                        f"**{role.name}** was removed from {member.mention} by {ctx.author.mention}")
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to manage that role.")
 
 @bot.command(name="addrole")
 @commands.has_permissions(manage_roles=True)
