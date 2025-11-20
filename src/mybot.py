@@ -135,6 +135,55 @@ async def on_message(message: discord.Message):
 
     await bot.process_commands(message)
 
+# ———————— welcome new members ————————
+@bot.event
+async def on_member_join(member: discord.Member):
+    guild = member.guild
+    print(f"New member joined: {member} in {guild.name}")
+    print(f"Guild has {guild.member_count} members now.")
+    print("Attempting to send welcome message...")
+    print(f"Guild Channels = {guild.text_channels}")
+    # 1. Try to find the most recently active text channel
+    target_channel = None
+    for channel in guild.text_channels:
+        if channel.permissions_for(guild.me).send_messages:
+            try:
+                async for msg in channel.history(limit=1):
+                    if msg.author != bot.user:  # ignore bot's own messages
+                        target_channel = channel
+                        break
+            except:
+                continue
+        if target_channel:
+            break
+
+    # 2. Fallback: system channel → default channel → first writable channel
+    if not target_channel:
+        target_channel = guild.system_channel
+    if not target_channel:
+        for ch in guild.text_channels:
+            if ch.permissions_for(guild.me).send_messages:
+                target_channel = ch
+                break
+
+    # 3. Send the welcome message
+    if target_channel:
+        welcome_text = f"🎉 Everyone welcome {member.mention} to **{guild.name}**! Say hi! 👋"
+        try:
+            await target_channel.send(welcome_text)
+        except:
+            pass  # silently fail if something weird happens
+
+    # 4. Optional: Still log to mod-log
+    await log_action(guild, "Member Joined", f"{member.mention} (`{member.id}`) joined the server. Total members: {guild.member_count}")
+
+    # 5. Optional: DM the new member (uncomment if you want it)
+    """
+    try:
+        await member.send(f"Welcome to **{guild.name}**! 🎉\nHave fun and follow the rules!")
+    except:
+        pass
+    """
 
 
 # Helper to add a warning
