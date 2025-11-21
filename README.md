@@ -87,7 +87,7 @@ This project is a Discord moderator bot built using the `discord.py` library. It
 - Send: `hello bot`
 - Bot responds: "Hello, {your name}! I am the moderator bot. Type !modhelp to be familiar with my commands."
 
-4. Use the follwing command usage examples
+4. Use the following command usage examples
    - `!createrole Role Name [color:#hex] [hoist:yes/no] [mentionable:yes/no]` create a role in the guild without guild settings on Discord App.
    - `!assign @Trave @Moderator` - 
    - `!kick @user [reason]` - Kick a user from the server.

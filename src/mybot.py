@@ -499,6 +499,58 @@ async def cmd_addrole(ctx, member: discord.Member, *, rolename: str):
     except Exception as e:
         await ctx.send(f"Failed to add role: {e}")
 
+# ———————— SET PERMISSIONS ON EXISTING ROLE ————————
+@bot.command(name="setperms")
+@commands.has_permissions(manage_roles=True)
+async def cmd_setperms(ctx, role_name: str, *, permissions: str = None):
+    """
+    Sets permissions on an existing role.
+    Usage:
+      !setperms Moderator kick_members,ban_members,manage_messages
+      !setperms Muted send_messages=False,add_reactions=False
+      !setperms Admin all
+      !setperms VIP clear
+    """
+    role = discord.utils.get(ctx.guild.roles, name=role_name)
+    if not role:
+        return await ctx.send(f"Role `{role_name}` not found!")
+
+    if role >= ctx.me.top_role:
+        return await ctx.send("I can't modify this role — it's higher than or equal to mine!")
+
+    if not permissions:
+        return await ctx.send("Usage: `!setperms RoleName kick_members,ban_members` or `all` or `clear`")
+
+    new_perms = discord.Permissions.none()
+
+    if permissions.lower() == "all":
+        new_perms = discord.Permissions.all()
+    elif permissions.lower() == "clear":
+        new_perms = discord.Permissions.none()
+    else:
+        perm_list = [p.strip() for p in permissions.split(",")]
+        for item in perm_list:
+            if "=" in item:
+                name, value = item.split("=", 1)
+                value = value.lower() == "true"
+            else:
+                name, value = item, True
+
+            if hasattr(discord.Permissions, name):
+                setattr(new_perms, name, value)
+            else:
+                await ctx.send(f"Unknown permission: `{name}`")
+                return
+
+    try:
+        await role.edit(permissions=new_perms, reason=f"Permissions set by {ctx.author}")
+        enabled = [p for p, v in new_perms if v]
+        await ctx.send(f"Permissions updated for **{role.name}**:\n```{', '.join(enabled) if enabled else 'None (cleared)'}```")
+        await log_action(ctx.guild, "Role Permissions Changed", 
+                        f"{ctx.author.mention} updated **{role.name}** → {', '.join(enabled) if enabled else 'cleared'}")
+    except discord.Forbidden:
+        await ctx.send("Failed — I don't have permission to edit this role!")
+
 @bot.command(name="removerole")
 @commands.has_permissions(manage_roles=True)
 async def cmd_removerole(ctx, member: discord.Member, *, rolename: str):
