@@ -551,6 +551,64 @@ async def cmd_setperms(ctx, role_name: str, *, permissions: str = None):
     except discord.Forbidden:
         await ctx.send("Failed — I don't have permission to edit this role!")
 
+# ————————  SHOW ROLE INFO (permissions + details) ————————
+@bot.command(name="roleinfo")
+async def cmd_roleinfo(ctx, *, role_name: str):
+    """Shows full info + current permissions of any role"""
+    role = discord.utils.get(ctx.guild.roles, name=role_name)
+    if not role:
+        return await ctx.send(f"Role `{role_name}` not found!")
+
+    # Count members with the role
+    members_with_role = len([m for m in ctx.guild.members if role in m.roles])
+
+    # List enabled permissions
+    enabled = [perm[0].replace("_", " ").title() for perm, value in role.permissions if value]
+    disabled = [perm[0].replace("_", " ").title() for perm, value in role.permissions if not value]
+
+    info = f"""
+            **{role.name}** (`{role.id}`)
+            Position: {len(ctx.guild.roles) - role.position} from top
+            Color: `{role.color}`
+            Hoist: {role.hoist} | Mentionable: {role.mentionable}
+            Members with role: **{members_with_role}**
+
+            **Enabled Permissions ({len(enabled)}):**
+            {', '.join(enabled) if enabled else 'None'}
+
+            **Disabled Permissions ({len(disabled)}):**
+            {', '.join(disabled[:15]) + ('...' if len(disabled) > 15 else '') if disabled else 'None'}
+                """.strip()
+
+    await ctx.send(info)
+    await log_action(ctx.guild, "Role Info Requested", f"{ctx.author.mention} checked info for **{role.name}**")
+
+
+# ———————— LIST ALL ROLES (with member count) ————————
+@bot.command(name="listroles")
+async def cmd_listroles(ctx):
+    """Shows all roles in order (top to bottom) with member count"""
+    if not ctx.guild.roles:
+        return await ctx.send("No roles found.")
+
+    lines = []
+    for role in reversed(ctx.guild.roles):  # Top → bottom
+        if role.name == "@everyone":
+            member_count = ctx.guild.member_count
+        else:
+            member_count = len(role.members)
+
+        lines.append(f"{role.position:2d}. {role.mention} — **{member_count}** members")
+
+    embed = discord.Embed(
+        title=f"Roles in {ctx.guild.name} ({len(ctx.guild.roles)} total)",
+        description="\n".join(lines),
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Top roles = higher in hierarchy")
+
+    await ctx.send(embed=embed)
+
 @bot.command(name="removerole")
 @commands.has_permissions(manage_roles=True)
 async def cmd_removerole(ctx, member: discord.Member, *, rolename: str):
