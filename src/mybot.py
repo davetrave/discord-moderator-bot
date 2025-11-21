@@ -101,7 +101,7 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_message(message: discord.Message):
-    print(f"Message from {message.author} in {message.guild}: {message.content}\n")  # debug
+    # print(f"Message from {message.author} in {message.guild}: {message.content}\n")  # debug
     if message.author.bot:
         return
     
@@ -555,7 +555,33 @@ async def cmd_setperms(ctx, role_name: str, *, permissions: str = None):
 @bot.command(name="roleinfo")
 async def cmd_roleinfo(ctx, *, role_name: str):
     """Shows full info + current permissions of any role"""
-    role = discord.utils.get(ctx.guild.roles, name=role_name)
+
+    # Try role by mention / id
+    role = None
+    # role mention format: <@&id>
+    if role_name.strip().startswith("<@&") and role_name.strip().endswith(">"):
+        try:
+            rid = int(role_name.strip()[3:-1])
+            role = ctx.guild.get_role(rid)
+        except Exception:
+            role = None
+    # numeric id
+    if role is None and role_name.strip().isdigit():
+        role = ctx.guild.get_role(int(role_name.strip()))
+    # exact case-insensitive match
+    if role is None:
+        role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    # partial case-insensitive match (first match)
+    if role is None:
+        role = discord.utils.find(lambda r: role_name.lower() in r.name.lower(), ctx.guild.roles)
+    # fallback: suggest close matches
+    if role is None:
+        names = [r.name for r in ctx.guild.roles]
+        close = difflib.get_close_matches(role_name, names, n=3, cutoff=0.5)
+        if close:
+            return await ctx.send(f"❌ Role `{role_name}` not found. Did you mean: {', '.join(close)} ?")
+        return await ctx.send(f"❌ Role `{role_name}` not found. Check spelling/capitalization or use role mention/ID.")
+    
     if not role:
         return await ctx.send(f"Role `{role_name}` not found!")
 
@@ -567,7 +593,7 @@ async def cmd_roleinfo(ctx, *, role_name: str):
     disabled = [perm[0].replace("_", " ").title() for perm, value in role.permissions if not value]
 
     info = f"""
-            **{role.name}** (`{role.id}`)
+            
             Position: {len(ctx.guild.roles) - role.position} from top
             Color: `{role.color}`
             Hoist: {role.hoist} | Mentionable: {role.mentionable}
@@ -579,8 +605,14 @@ async def cmd_roleinfo(ctx, *, role_name: str):
             **Disabled Permissions ({len(disabled)}):**
             {', '.join(disabled[:15]) + ('...' if len(disabled) > 15 else '') if disabled else 'None'}
                 """.strip()
-
-    await ctx.send(info)
+    
+    embed = discord.Embed(
+        title=f"**{role.name}** (`{role.id}`)",
+        description=info,
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Role Information")
+    await ctx.send(embed=embed)
     await log_action(ctx.guild, "Role Info Requested", f"{ctx.author.mention} checked info for **{role.name}**")
 
 
