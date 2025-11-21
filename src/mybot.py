@@ -18,7 +18,19 @@ BLACKLIST_FILE = "../data/blacklist.json"
 LOG_CHANNEL_NAME = "mod-log"
 MUTED_ROLE_NAME = "Muted"
 AUTO_DELETE_IN_SECONDS = 5  # how long to keep auto-deleted messages in DM notifications, not needed by Discord API
+
+# Emoji / UI
+EMOJI_SUCCESS = "✅"
+EMOJI_ERROR = "❌"
+EMOJI_WARN = "⚠️"
+EMOJI_INFO = "ℹ️"
+EMOJI_LOCK = "🔒"
 # -----------------------------------
+
+# Utility: create a consistent embed
+def make_embed(title: str = None, description: str = None, color=discord.Color.blurple()):
+    e = discord.Embed(title=title, description=description, color=color, timestamp=datetime.utcnow())
+    return e
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -108,8 +120,14 @@ async def on_message(message: discord.Message):
     if message.content and message.guild and not message.content.startswith(PREFIX):
         # The bot will send a greeting message in the channel where the user posted
         if message.content.lower().startswith("hello bot"):
-            response = f"Hello, {message.author.display_name}! I am the moderator bot. \nType !modhelp to be familiar with my commands."
-            await message.channel.send(response)
+            embed = make_embed(
+                title=f"{EMOJI_INFO} Hello, {message.author.display_name}!",
+                description="I am the moderator bot. Type `!modhelp` to see moderation commands."
+            )
+            try:
+                await message.channel.send(embed=embed)
+            except:
+                pass
 
     guild = message.guild
     if guild:
@@ -130,7 +148,12 @@ async def on_message(message: discord.Message):
             await warn_user(guild, message.author, None, f"Auto-moderation: used blocked word '{trigger}'")
             await log_action(guild, "Auto-moderation", f"Deleted message from {message.author.mention} containing blocked word '{trigger}'.")
             try:
-                await message.author.send(f"Your message in {guild.name} was removed for containing a blocked word.")
+                dm = make_embed(
+                    title=f"{EMOJI_WARN} Message removed",
+                    description=f"Your message in **{guild.name}** was removed for containing a blocked word: `{trigger}`.\nPlease follow the server rules."
+                )
+                dm.set_footer(text=f"This message will auto-delete in {AUTO_DELETE_IN_SECONDS}s")
+                await message.author.send(embed=dm)
             except Exception:
                 pass
 
@@ -210,20 +233,30 @@ async def warn_user(guild: discord.Guild, user: discord.Member, moderator: Optio
 async def cmd_kick(ctx, member: discord.Member, *, reason: str = "No reason provided"):
     try:
         await member.kick(reason=reason)
-        await ctx.send(f"{member} has been kicked. Reason: {reason}")
+        embed = make_embed(
+            title=f"{EMOJI_SUCCESS} Member Kicked",
+            description=f"{member.mention} has been kicked.\n**Reason:** {reason}"
+        )
+        embed.set_footer(text=f"Action by: {ctx.author}", )
+        await ctx.send(embed=embed)
         await log_action(ctx.guild, "Member Kicked", f"{member.mention} kicked by {ctx.author.mention}. Reason: {reason}")
     except Exception as e:
-        await ctx.send(f"Failed to kick: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to kick", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
 async def cmd_ban(ctx, member: discord.Member, *, reason: str = "No reason provided"):
     try:
         await member.ban(reason=reason)
-        await ctx.send(f"{member} has been banned. Reason: {reason}")
+        embed = make_embed(
+            title=f"{EMOJI_SUCCESS} Member Banned",
+            description=f"{member.mention} has been banned.\n**Reason:** {reason}"
+        )
+        embed.set_footer(text=f"Action by: {ctx.author}")
+        await ctx.send(embed=embed)
         await log_action(ctx.guild, "Member Banned", f"{member.mention} banned by {ctx.author.mention}. Reason: {reason}")
     except Exception as e:
-        await ctx.send(f"Failed to ban: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to ban", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="unban")
 @commands.has_permissions(ban_members=True)
@@ -232,59 +265,62 @@ async def cmd_unban(ctx, *, user: str):
     try:
         name, discrim = user.split("#")
     except ValueError:
-        await ctx.send("Use format: username#discriminator")
-        return
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Bad format", description="Use format: `username#discriminator`", color=discord.Color.orange()))
     bans = await ctx.guild.bans()
     for ban_entry in bans:
         if (ban_entry.user.name, ban_entry.user.discriminator) == (name, discrim):
             await ctx.guild.unban(ban_entry.user)
-            await ctx.send(f"Unbanned {ban_entry.user}")
+            await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Unbanned", description=f"Unbanned {ban_entry.user}"))
             await log_action(ctx.guild, "Member Unbanned", f"{ban_entry.user} unbanned by {ctx.author.mention}")
             return
-    await ctx.send("User not found in ban list.")
+    await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} Not found", description="User not found in ban list.", color=discord.Color.gold()))
 
 @bot.command(name="mute")
 @commands.has_permissions(manage_roles=True)
 async def cmd_mute(ctx, member: discord.Member, duration: Optional[int] = None, *, reason: str = "No reason provided"):
     role = await ensure_muted_role(ctx.guild)
     if not role:
-        await ctx.send("Unable to create/find Muted role. Ensure the bot has Manage Roles permission.")
-        return
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Muted role missing", description="Unable to create/find Muted role. Ensure the bot has Manage Roles permission.", color=discord.Color.red()))
     try:
         await member.add_roles(role, reason=reason)
-        await ctx.send(f"{member.mention} has been muted. Reason: {reason}")
+        desc = f"{member.mention} has been muted.\n**Reason:** {reason}"
+        if duration and duration > 0:
+            desc += f"\nWill be auto-unmuted after {duration} minutes."
+        await ctx.send(embed=make_embed(title=f"{EMOJI_WARN} Member Muted", description=desc))
         await log_action(ctx.guild, "Member Muted", f"{member.mention} muted by {ctx.author.mention}. Reason: {reason}")
         if duration and duration > 0:
             await asyncio.sleep(duration * 60)
             # check if still muted
-            if role in member.roles:
+            m = ctx.guild.get_member(member.id)
+            if m and role in m.roles:
                 try:
-                    await member.remove_roles(role, reason="Auto unmute after duration")
-                    await log_action(ctx.guild, "Member Unmuted", f"{member.mention} auto-unmuted after {duration} minutes.")
+                    await m.remove_roles(role, reason="Auto unmute after duration")
+                    await log_action(ctx.guild, "Member Unmuted", f"{m.mention} auto-unmuted after {duration} minutes.")
+                    # notify channel
+                    await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Auto-unmuted", description=f"{m.mention} was auto-unmuted after {duration} minutes."))
                 except Exception:
                     pass
     except Exception as e:
-        await ctx.send(f"Failed to mute: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to mute", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="unmute")
 @commands.has_permissions(manage_roles=True)
 async def cmd_unmute(ctx, member: discord.Member):
     role = discord.utils.get(ctx.guild.roles, name=MUTED_ROLE_NAME)
     if not role:
-        await ctx.send("Muted role doesn't exist.")
-        return
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} Not found", description="Muted role doesn't exist.", color=discord.Color.orange()))
     try:
         await member.remove_roles(role)
-        await ctx.send(f"{member.mention} has been unmuted.")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Member Unmuted", description=f"{member.mention} has been unmuted."))
         await log_action(ctx.guild, "Member Unmuted", f"{member.mention} unmuted by {ctx.author.mention}.")
     except Exception as e:
-        await ctx.send(f"Failed to unmute: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to unmute", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="warn")
 @commands.has_permissions(kick_members=True)
 async def cmd_warn(ctx, member: discord.Member, *, reason: str = "No reason provided"):
     await warn_user(ctx.guild, member, ctx.author, reason)
-    await ctx.send(f"{member.mention} has been warned. Reason: {reason}")
+    await ctx.send(embed=make_embed(title=f"{EMOJI_WARN} Warned", description=f"{member.mention} has been warned.\n**Reason:** {reason}"))
 
 @bot.command(name="warnings")
 @commands.has_permissions(kick_members=True)
@@ -293,14 +329,13 @@ async def cmd_warnings(ctx, member: discord.Member):
     ukey = str(member.id)
     user_warnings = warnings_db.get(gkey, {}).get(ukey, [])
     if not user_warnings:
-        await ctx.send(f"{member.mention} has no warnings.")
-        return
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} No warnings", description=f"{member.mention} has no warnings.", color=discord.Color.green()))
     lines = []
     for i, w in enumerate(user_warnings, 1):
         lines.append(f"{i}. {w['reason']} — by {w.get('by_name','Unknown')} at {w['time']}")
-    # send in chunks if long
     text = "\n".join(lines)
-    await ctx.send(f"Warnings for {member.mention}:\n{text}")
+    embed = make_embed(title=f"{EMOJI_WARN} Warnings for {member.display_name}", description=text)
+    await ctx.send(embed=embed)
 
 @bot.command(name="clearwarns")
 @commands.has_permissions(kick_members=True)
@@ -310,19 +345,18 @@ async def cmd_clearwarns(ctx, member: discord.Member):
     if gkey in warnings_db and ukey in warnings_db[gkey]:
         warnings_db[gkey][ukey] = []
         save_json(WARNINGS_FILE, warnings_db)
-        await ctx.send(f"Cleared warnings for {member.mention}.")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Cleared warnings", description=f"Cleared warnings for {member.mention}."))
         await log_action(ctx.guild, "Warnings Cleared", f"Warnings for {member.mention} cleared by {ctx.author.mention}.")
     else:
-        await ctx.send("No warnings to clear.")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} Nothing to clear", description="No warnings to clear.", color=discord.Color.gold()))
 
 @bot.command(name="purge")
 @commands.has_permissions(manage_messages=True)
 async def cmd_purge(ctx, amount: int = 10):
     if amount < 1 or amount > 100:
-        await ctx.send("Amount must be between 1 and 100.")
-        return
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Invalid amount", description="Amount must be between 1 and 100.", color=discord.Color.orange()))
     deleted = await ctx.channel.purge(limit=amount + 1)  # +1 to include command message
-    await ctx.send(f"Deleted {len(deleted)-1} messages.", delete_after=5)
+    await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Purged messages", description=f"Deleted {len(deleted)-1} messages."), delete_after=5)
     await log_action(ctx.guild, "Messages Purged", f"{ctx.author.mention} purged {len(deleted)-1} messages in {ctx.channel.mention}")
 
 @bot.command(name="lock")
@@ -333,10 +367,10 @@ async def cmd_lock(ctx, channel: Optional[discord.TextChannel] = None):
     overwrite.send_messages = False
     try:
         await channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
-        await ctx.send(f"Locked {channel.mention}.")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_LOCK if hasattr(__import__('discord'), 'PermissionOverwrite') else '🔒'} Channel Locked", description=f"Locked {channel.mention}."))
         await log_action(ctx.guild, "Channel Locked", f"{channel.mention} locked by {ctx.author.mention}.")
     except Exception as e:
-        await ctx.send(f"Failed to lock: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to lock", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="unlock")
 @commands.has_permissions(manage_channels=True)
@@ -346,10 +380,10 @@ async def cmd_unlock(ctx, channel: Optional[discord.TextChannel] = None):
     overwrite.send_messages = True
     try:
         await channel.set_permissions(ctx.guild.default_role, overwrite=overwrite)
-        await ctx.send(f"Unlocked {channel.mention}.")
+        await ctx.send(embed=make_embed(title="🔓 Channel Unlocked", description=f"Unlocked {channel.mention}."))
         await log_action(ctx.guild, "Channel Unlocked", f"{channel.mention} unlocked by {ctx.author.mention}.")
     except Exception as e:
-        await ctx.send(f"Failed to unlock: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to unlock", description=str(e), color=discord.Color.red()))
 
 @bot.command(name="createrole")
 @commands.has_permissions(manage_roles=True)
@@ -357,13 +391,23 @@ async def cmd_createrole(ctx, *, role_name_and_options: str = None):
     """
     Creates a new role with optional settings.
     Usage examples:
-      !createrole Moderator
-      !createrole Admin color:#ff0000 hoist:yes mentionable:yes
-      !createrole Verified color:green
-      !createrole Muted color:#2f3136 hoist:no
+      `!createrole Moderator`
+      `!createrole Admin color:#ff0000 hoist:yes mentionable:yes`
+      `!createrole Verified color:green`
+      `!createrole Muted color:#2f3136 hoist:no`
     """
     if not role_name_and_options:
-        return await ctx.send("Usage: `!createrole Role Name [color:#hex] [hoist:yes/no] [mentionable:yes/no]`")
+        embed = make_embed(
+            title=f"{EMOJI_INFO} Bad Command Format", 
+            description="Creates a new role with optional settings.\n\n"
+                        "**Usage examples:**\n"
+                        "`!createrole Moderator`\n"
+                        "`!createrole Admin color:#ff0000 hoist:yes mentionable:yes`\n"
+                        "`!createrole Verified color:green`\n"
+                        "`!createrole Muted color:#2f3136 hoist:no`",
+            color=discord.Color.blue()
+            )
+        return await ctx.send(embed=embed)
 
     # Split name and options
     parts = role_name_and_options.strip().split()
@@ -402,12 +446,12 @@ async def cmd_createrole(ctx, *, role_name_and_options: str = None):
             mentionable=mentionable,
             reason=f"Created by {ctx.author}"
         )
-        await ctx.send(f"Role **{new_role.name}** created successfully! {new_role.mention}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_SUCCESS} Role Created", description=f"Role **{new_role.name}** created successfully! {new_role.mention}"))
         await log_action(ctx.guild, "Role Created", f"{ctx.author.mention} created role **{new_role.name}**")
     except discord.Forbidden:
-        await ctx.send("I don't have permission to create roles. Move my role higher!")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Permission denied", description="I don't have permission to create roles. Move my role higher!", color=discord.Color.red()))
     except Exception as e:
-        await ctx.send(f"Failed: {e}")
+        await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed", description=str(e), color=discord.Color.red()))
 
 # ———————— ASSIGN ROLE (Give any role to a user) ————————
 @bot.command(name="assign")
@@ -511,7 +555,31 @@ async def cmd_setperms(ctx, role_name: str, *, permissions: str = None):
       !setperms Admin all
       !setperms VIP clear
     """
-    role = discord.utils.get(ctx.guild.roles, name=role_name)
+    role = None
+    # role mention format: <@&id>
+    if role_name.strip().startswith("<@&") and role_name.strip().endswith(">"):
+        try:
+            rid = int(role_name.strip()[3:-1])
+            role = ctx.guild.get_role(rid)
+        except Exception:
+            role = None
+    # numeric id
+    if role is None and role_name.strip().isdigit():
+        role = ctx.guild.get_role(int(role_name.strip()))
+    # exact case-insensitive match
+    if role is None:
+        role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    # partial case-insensitive match (first match)
+    if role is None:
+        role = discord.utils.find(lambda r: role_name.lower() in r.name.lower(), ctx.guild.roles)
+    # fallback: suggest close matches
+    if role is None:
+        names = [r.name for r in ctx.guild.roles]
+        close = difflib.get_close_matches(role_name, names, n=3, cutoff=0.5)
+        if close:
+            return await ctx.send(f"❌ Role `{role_name}` not found. Did you mean: {', '.join(close)} ?")
+        return await ctx.send(f"❌ Role `{role_name}` not found. Check spelling/capitalization or use role mention/ID.")
+    
     if not role:
         return await ctx.send(f"Role `{role_name}` not found!")
 
@@ -694,12 +762,29 @@ async def cmd_blacklist_remove(ctx, *, word: str):
 @bot.command(name="modhelp")
 async def cmd_help(ctx):
     text = (
-        f"Moderation commands (prefix {PREFIX}):\n"
-        "kick/ban/unban/mute/unmute/warn/warnings/clearwarns\n"
-        "purge/lock/unlock/addrole/removerole\n"
-        "blacklist add/remove/list\n"
+        f"""
+        Moderation commands (prefix {PREFIX}):
+        `!kick @user [reason]` - Kick a member
+        `!ban @user [reason]` - Ban a member
+        `!unban username#discriminator` - Unban a member
+        `!mute @user [duration_minutes] [reason]` - Mute a member
+        `!unmute @user` - Unmute a member
+        `!warn @user [reason]` - Warn a member
+        `!warnings @user` - List warnings for a member
+        `!clearwarns @user` - Clear warnings for a member
+        `!purge [amount]` - Delete recent messages
+        `!lock [#channel]` - Lock a channel
+        `!unlock [#channel]` - Unlock a channel
+        `!addrole @user RoleName` - Add a role to a user (creates role if missing)
+        `!removerole @user RoleName` - Remove a role from a user
+        `!createrole RoleName [options]` - Create a new role with options
+        `!setperms RoleName permissions` - Set permissions on an existing role
+        `!roleinfo RoleName` - Show info about a role
+        `!listroles` - List all roles in the server
+        """
     )
-    await ctx.send(text)
+    await ctx.send(embed = make_embed(title="Moderator Bot Help", 
+                                      description=text))
 
 # Error handlers
 @bot.event
