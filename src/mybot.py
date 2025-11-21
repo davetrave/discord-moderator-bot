@@ -7,6 +7,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+import difflib
 
 load_dotenv()  # loads .env in project root into environment
 
@@ -177,13 +178,13 @@ async def on_member_join(member: discord.Member):
     # 4. Optional: Still log to mod-log
     await log_action(guild, "Member Joined", f"{member.mention} (`{member.id}`) joined the server. Total members: {guild.member_count}")
 
-    # 5. Optional: DM the new member (uncomment if you want it)
-    """
+    # 5. Optional: DM the new member (comment if you needed)
+    
     try:
         await member.send(f"Welcome to **{guild.name}**! 🎉\nHave fun and follow the rules!")
     except:
         pass
-    """
+    
 
 
 # Helper to add a warning
@@ -350,19 +351,99 @@ async def cmd_unlock(ctx, channel: Optional[discord.TextChannel] = None):
     except Exception as e:
         await ctx.send(f"Failed to unlock: {e}")
 
+@bot.command(name="createrole")
+@commands.has_permissions(manage_roles=True)
+async def cmd_createrole(ctx, *, role_name_and_options: str = None):
+    """
+    Creates a new role with optional settings.
+    Usage examples:
+      !createrole Moderator
+      !createrole Admin color:#ff0000 hoist:yes mentionable:yes
+      !createrole Verified color:green
+      !createrole Muted color:#2f3136 hoist:no
+    """
+    if not role_name_and_options:
+        return await ctx.send("Usage: `!createrole Role Name [color:#hex] [hoist:yes/no] [mentionable:yes/no]`")
+
+    # Split name and options
+    parts = role_name_and_options.strip().split()
+    role_name = parts[0]
+    options = " ".join(parts[1:]).lower()
+
+    # Default values
+    color = discord.Color.default()
+    hoist = False
+    mentionable = False
+
+    # Parse options
+    if "color:" in options:
+        hex_part = options.split("color:")[1].split()[0]
+        try:
+            if hex_part.startswith("#"):
+                color = discord.Color(int(hex_part[1:], 16))
+            elif hex_part in ["red", "green", "blue", "purple", "orange", "gold", "blurple", "grey"]:
+                color = getattr(discord.Color, hex_part)()
+            else:
+                color = discord.Color(int(hex_part, 16))
+        except:
+            color = discord.Color.random()
+
+    if "hoist:yes" in options:
+        hoist = True
+    if "mentionable:yes" in options:
+        mentionable = True
+
+    # Create the role
+    try:
+        new_role = await ctx.guild.create_role(
+            name=role_name,
+            color=color,
+            hoist=hoist,
+            mentionable=mentionable,
+            reason=f"Created by {ctx.author}"
+        )
+        await ctx.send(f"Role **{new_role.name}** created successfully! {new_role.mention}")
+        await log_action(ctx.guild, "Role Created", f"{ctx.author.mention} created role **{new_role.name}**")
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to create roles. Move my role higher!")
+    except Exception as e:
+        await ctx.send(f"Failed: {e}")
+
 # ———————— ASSIGN ROLE (Give any role to a user) ————————
 @bot.command(name="assign")
 @commands.has_permissions(manage_roles=True)
 async def cmd_assign(ctx, member: discord.Member, *, role_name: str):
     """
     Usage: !assign @User Role Name
-    Gives the exact role (case-sensitive) to the user.
+    Accepts role mention, role ID, exact case-insensitive name or partial name.
     """
-    role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    # Try role by mention / id
+    role = None
+    # role mention format: <@&id>
+    if role_name.strip().startswith("<@&") and role_name.strip().endswith(">"):
+        try:
+            rid = int(role_name.strip()[3:-1])
+            role = ctx.guild.get_role(rid)
+        except Exception:
+            role = None
+    # numeric id
+    if role is None and role_name.strip().isdigit():
+        role = ctx.guild.get_role(int(role_name.strip()))
+    # exact case-insensitive match
+    if role is None:
+        role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), ctx.guild.roles)
+    # partial case-insensitive match (first match)
+    if role is None:
+        role = discord.utils.find(lambda r: role_name.lower() in r.name.lower(), ctx.guild.roles)
+    # fallback: suggest close matches
+    if role is None:
+        names = [r.name for r in ctx.guild.roles]
+        close = difflib.get_close_matches(role_name, names, n=3, cutoff=0.5)
+        if close:
+            return await ctx.send(f"❌ Role `{role_name}` not found. Did you mean: {', '.join(close)} ?")
+        return await ctx.send(f"❌ Role `{role_name}` not found. Check spelling/capitalization or use role mention/ID.")
     
-    if not role:
-        return await ctx.send(f"❌ Role `{role_name}` not found. Check spelling/capitalization.")
-    
+    # permission/position checks
     if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
         return await ctx.send("❌ You cannot assign a role that is higher than or equal to your highest role.")
     
