@@ -781,10 +781,15 @@ async def cmd_help(ctx):
         `!setperms RoleName permissions` - Set permissions on an existing role
         `!roleinfo RoleName` - Show info about a role
         `!listroles` - List all roles in the server
+        `!blacklist` - Show blacklisted words
+        `!blacklist add word` - Add a word to the blacklist
+        `!blacklist remove word` - Remove a word from the blacklist
+        `!modhelp` - Show this help message
+        `!assign @user RoleName` - Assign a role to a user
+        `!remove @user RoleName` - Remove a role from a user
         """
     )
-    await ctx.send(embed = make_embed(title="Moderator Bot Help", 
-                                      description=text))
+    await ctx.send(embed = make_embed(title="Moderator Bot Help", description=text))
 
 # Error handlers
 @bot.event
