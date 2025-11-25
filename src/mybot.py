@@ -290,7 +290,11 @@ async def cmd_unban(ctx, *, user: str):
         name, discrim = user.split("#")
     except ValueError:
         return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Bad format", description="Use format: `username#discriminator`", color=discord.Color.orange()))
-    bans = await ctx.guild.bans()
+    # collect bans from async iterator
+    try:
+        bans = [ban_entry async for ban_entry in ctx.guild.bans()]
+    except Exception as e:
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to fetch bans", description=str(e), color=discord.Color.red()))
     for ban_entry in bans:
         if (ban_entry.user.name, ban_entry.user.discriminator) == (name, discrim):
             await ctx.guild.unban(ban_entry.user)
@@ -395,7 +399,7 @@ async def cmd_banned(ctx):
     Lists users currently banned from the guild (shows username#discriminator and reason if present).
     """
     try:
-        bans = await ctx.guild.bans()
+        bans = [ban_entry async for ban_entry in ctx.guild.bans()]
     except Exception as e:
         return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to fetch bans", description=str(e), color=discord.Color.red()))
 
