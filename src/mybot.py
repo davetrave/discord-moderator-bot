@@ -348,17 +348,74 @@ async def cmd_warn(ctx, member: discord.Member, *, reason: str = "No reason prov
 
 @bot.command(name="warnings")
 @commands.has_permissions(kick_members=True)
-async def cmd_warnings(ctx, member: discord.Member):
+async def cmd_warnings(ctx, member: Optional[discord.Member] = None):
+    """
+    If a member is provided: show that member's warnings.
+    If no member provided: list all users in this guild who have warnings (with counts).
+    """
     gkey = str(ctx.guild.id)
-    ukey = str(member.id)
-    user_warnings = warnings_db.get(gkey, {}).get(ukey, [])
-    if not user_warnings:
-        return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} No warnings", description=f"{member.mention} has no warnings.", color=discord.Color.green()))
+
+    # If a specific member was requested, show their warnings
+    if member:
+        ukey = str(member.id)
+        user_warnings = warnings_db.get(gkey, {}).get(ukey, [])
+        if not user_warnings:
+            return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} No warnings", description=f"{member.mention} has no warnings.", color=discord.Color.green()))
+        lines = []
+        for i, w in enumerate(user_warnings, 1):
+            lines.append(f"{i}. {w['reason']} — by {w.get('by_name','Unknown')} at {w['time']}")
+        text = "\n".join(lines)
+        embed = make_embed(title=f"{EMOJI_WARN} Warnings for {member.display_name}", description=text)
+        return await ctx.send(embed=embed)
+
+    # No member provided: list all warned users in the guild
+    guild_warns = warnings_db.get(gkey, {})
+    # build a list of users with non-empty warnings
+    warned = []
+    for uid, entries in guild_warns.items():
+        if entries:
+            member_obj = ctx.guild.get_member(int(uid))
+            display = member_obj.mention if member_obj else f"<@{uid}"
+            warned.append((display, len(entries)))
+
+    if not warned:
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} No warnings", description="No users have warnings in this server.", color=discord.Color.green()))
+
+    # Sort by descending warning count
+    warned.sort(key=lambda x: x[1], reverse=True)
+    lines = [f"{i+1}. {u} — **{count}** warning(s)" for i, (u, count) in enumerate(warned)]
+    desc = "\n".join(lines)
+    embed = make_embed(title=f"{EMOJI_WARN} Users with warnings", description=desc)
+    await ctx.send(embed=embed)
+
+@bot.command(name="banned")
+@commands.has_permissions(ban_members=True)
+async def cmd_banned(ctx):
+    """
+    Lists users currently banned from the guild (shows username#discriminator and reason if present).
+    """
+    try:
+        bans = await ctx.guild.bans()
+    except Exception as e:
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_ERROR} Failed to fetch bans", description=str(e), color=discord.Color.red()))
+
+    if not bans:
+        return await ctx.send(embed=make_embed(title=f"{EMOJI_INFO} No bans", description="No users are banned from this server.", color=discord.Color.green()))
+
     lines = []
-    for i, w in enumerate(user_warnings, 1):
-        lines.append(f"{i}. {w['reason']} — by {w.get('by_name','Unknown')} at {w['time']}")
-    text = "\n".join(lines)
-    embed = make_embed(title=f"{EMOJI_WARN} Warnings for {member.display_name}", description=text)
+    for ban_entry in bans:
+        user = ban_entry.user
+        reason = ban_entry.reason or "No reason provided"
+        lines.append(f"{user} — {reason}")
+
+    # If too many bans, truncate the list
+    max_lines = 25
+    more = ""
+    if len(lines) > max_lines:
+        more = f"\n…and {len(lines)-max_lines} more..."
+        lines = lines[:max_lines]
+
+    embed = make_embed(title=f"{EMOJI_WARN} Banned users ({len(bans)})", description="\n".join(lines) + more)
     await ctx.send(embed=embed)
 
 @bot.command(name="clearwarns")
@@ -795,6 +852,8 @@ async def cmd_help(ctx):
         `!unmute @user` - Unmute a member
         `!warn @user [reason]` - Warn a member
         `!warnings @user` - List warnings for a member
+        `!warnings` - List members with warnings
+        `!banned` - List banned users
         `!clearwarns @user` - Clear warnings for a member
         `!purge [amount]` - Delete recent messages
         `!lock [#channel]` - Lock a channel
