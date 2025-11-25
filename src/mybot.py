@@ -1,4 +1,4 @@
-# filepath: /discord-moderator-bot/discord-moderator-bot/src/mybot.py
+# filepath: e:\dave\DiscordBot Console\discord-moderator-bot\src\mybot.py
 import os
 import json
 import asyncio
@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import difflib
+from discoviews import ConfirmBanView
 
 load_dotenv()  # loads .env in project root into environment
 
@@ -250,6 +251,46 @@ async def warn_user(guild: discord.Guild, user: discord.Member, moderator: Optio
     save_json(WARNINGS_FILE, warnings_db)
     await log_action(guild, "Warn Issued", f"{user.mention} was warned by {entry['by_name']}: {reason}")
 
+    # If warnings reached threshold, send confirmation request to moderators
+    try:
+        count = len(warnings_db[gkey][ukey])
+    except Exception:
+        count = 0
+
+    THRESHOLD = 3
+    if count >= THRESHOLD:
+        # build message and view
+        mod_role = discord.utils.find(lambda r: r.name.lower() in ("moderator", "mod", "mods"), guild.roles)
+        mod_mention = mod_role.mention if mod_role else "@here"
+        embed = make_embed(
+            title=f"{EMOJI_WARN} {user.display_name} reached {THRESHOLD} warnings",
+            description=f"{user.mention} has accumulated **{count}** warnings.\n\nReason (most recent): {reason}\n\n{mod_mention} — confirm ban?",
+            color=discord.Color.red()
+        )
+        # send in mod-log if available, else try system channel, else first writable channel
+        ch = await get_mod_log(guild)
+        sent_channel = None
+        if ch:
+            try:
+                await ch.send(embed=embed, view=ConfirmBanView(guild, user.id))
+                sent_channel = ch
+            except Exception:
+                sent_channel = None
+
+        if not sent_channel:
+            # fallback to system channel or first writable text channel
+            target = guild.system_channel
+            if not target:
+                for c in guild.text_channels:
+                    if c.permissions_for(guild.me).send_messages:
+                        target = c
+                        break
+            if target:
+                try:
+                    await target.send(embed=embed, view=ConfirmBanView(guild, user.id))
+                except Exception:
+                    pass
+
 # Basic moderation commands require appropriate permissions
 
 @bot.command(name="kick")
@@ -408,7 +449,7 @@ async def cmd_banned(ctx):
 
     lines = []
     for ban_entry in bans:
-        user = ban_entry.user
+        user = ban_entry.user.name + "#" + ban_entry.user.discriminator
         reason = ban_entry.reason or "No reason provided"
         lines.append(f"{user} — {reason}")
 
