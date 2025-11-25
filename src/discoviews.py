@@ -21,7 +21,7 @@ class ConfirmBanView(discord.ui.View):
                     return
         except Exception:
             pass
-
+    
     @discord.ui.button(label="Confirm Ban", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Only allow moderators (manage_guild) or users with a role named "moderator"/"mod" to confirm
@@ -29,6 +29,7 @@ class ConfirmBanView(discord.ui.View):
         if not is_mod:
             await interaction.response.send_message("You are not authorized to confirm this ban.", ephemeral=True)
             return
+
         # fetch member
         member = self.guild.get_member(self.target_id)
         if not member:
@@ -45,6 +46,8 @@ class ConfirmBanView(discord.ui.View):
             self.stop()
         except Exception as e:
             await interaction.response.send_message(f"Failed to ban: {e}", ephemeral=True)
+
+    
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
