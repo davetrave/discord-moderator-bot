@@ -681,8 +681,8 @@ async def cmd_roleinfo(ctx, *, role_name: str):
     members_with_role = len([m for m in ctx.guild.members if role in m.roles])
 
     # List enabled permissions
-    enabled = [perm[0].replace("_", " ").title() for perm, value in role.permissions if value]
-    disabled = [perm[0].replace("_", " ").title() for perm, value in role.permissions if not value]
+    enabled = [perm.replace("_", " ").title() for perm, value in role.permissions if value]
+    disabled = [perm.replace("_", " ").title() for perm, value in role.permissions if not value]
 
     info = f"""
             
