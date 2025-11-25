@@ -13,8 +13,11 @@ load_dotenv()  # loads .env in project root into environment
 
 # ---------- Configuration ----------
 PREFIX = "!"
-WARNINGS_FILE = "../data/warnings.json"
-BLACKLIST_FILE = "../data/blacklist.json"
+# --- use an absolute data directory relative to this file ---
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+WARNINGS_FILE = os.path.join(DATA_DIR, "warnings.json")
+BLACKLIST_FILE = os.path.join(DATA_DIR, "blacklist.json")
 LOG_CHANNEL_NAME = "mod-log"
 MUTED_ROLE_NAME = "Muted"
 AUTO_DELETE_IN_SECONDS = 5  # how long to keep auto-deleted messages in DM notifications, not needed by Discord API
@@ -42,13 +45,34 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=commands
 
 # Load / save helpers
 def load_json(path, default):
+    # create file with default if missing
+    if not os.path.exists(path):
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(default, f, indent=2)
+        except Exception:
+            pass
+        return default
+
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+    except json.JSONDecodeError:
+        # backup bad file and recreate a clean one
+        try:
+            bak = path + ".bak"
+            os.rename(path, bak)
+            print(f"Warning: invalid JSON in {path} — backed up to {bak} and recreated default.")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(default, f, indent=2)
+        except Exception:
+            pass
+        return default
     except Exception:
         return default
 
 def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
