@@ -136,6 +136,34 @@ async def on_guild_join(guild):
     save_json(WARNINGS_FILE, warnings_db)
     save_json(BLACKLIST_FILE, blacklists)
 
+    # Send a friendly intro message in a suitable channel when the bot joins
+    intro = make_embed(
+        title=f"{EMOJI_INFO} Moderator Bot here!",
+        description=(
+            f"Thanks for inviting me to **{guild.name}** 👋\n\n"
+            f"My prefix is `{PREFIX}` — type `{PREFIX}modhelp` to see moderation commands.\n\n"
+            "I will create a `mod-log` channel if needed to post moderation actions."
+        ),
+        color=discord.Color.blurple()
+    )
+    # Prefer system_channel, else first writable text channel
+    target = guild.system_channel
+    if not target:
+        for ch in guild.text_channels:
+            if ch.permissions_for(guild.me).send_messages:
+                target = ch
+                break
+
+    if target:
+        try:
+            await target.send(embed=intro)
+        except Exception:
+            # ignore failures (no perms, channel deleted, etc.)
+            pass
+
+    # Log join
+    await log_action(guild, "Bot Joined Guild", f"Joined guild **{guild.name}** (`{guild.id}`)")
+
 @bot.event
 async def on_message(message: discord.Message):
     # print(f"Message from {message.author} in {message.guild}: {message.content}\n")  # debug
